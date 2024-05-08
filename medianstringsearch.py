@@ -2,14 +2,40 @@ import unittest
 from patterncount import number_to_pattern, hamming_distance, symbol_to_number
 
 
-def score(motifs, k):
-    counts = [[0] * 4 for _ in range(k)]
-
+def make_counts(motifs, k, pseudo_count=0):
+    counts = [[pseudo_count] * 4 for _ in range(k)]
     for motif in motifs:
         for i in range(k):
             current_nuc = motif[i]
             j = symbol_to_number(current_nuc)
             counts[i][j] += 1
+    return counts
+
+
+def profile(motifs, k):
+    t = len(motifs)
+    pseudo_count = 1
+    counts = make_counts(motifs, k, pseudo_count=pseudo_count)
+    profile = [[0] * 4 for _ in range(k)]
+    for i in range(k):
+        for j in range(4):
+            profile[i][j] = counts[i][j] / (t + 4 * pseudo_count)
+    print(profile)
+
+
+def score(motifs, k):
+
+    total_score = 0
+
+    counts = make_counts(motifs, k)
+
+    for i in range(k):
+        most_frequent = counts[i].index(max(counts[i]))
+        for j in range(4):
+            if j != most_frequent:
+                total_score += counts[i][j]
+
+    return total_score
 
 
 def d(pattern, dna):
@@ -42,6 +68,16 @@ def median_string(dna, k):
     return median_pattern
 
 
+def probability(motif_profile, pattern, k):
+    prob = 1
+    for i in range(k):
+        symbol = pattern[i]
+        j = symbol_to_number(symbol)
+        symbol_probability = motif_profile[i][j]
+        prob *= symbol_probability
+    return prob
+
+
 class TestMedianStringSearch(unittest.TestCase):
     def test_d(self):
         dna_sequence = [
@@ -66,6 +102,14 @@ class TestMedianStringSearch(unittest.TestCase):
         ]
 
         self.assertEqual("CCT", median_string(dna_sequence, 3))
+
+    def test_score(self):
+        motifs = ["ATGCAA", "CTCCAA", "AGCCAA"]
+        self.assertEqual(3, score(motifs, 6))
+
+    def test_profile(self):
+        motifs = ["ATGCAA", "CTCCAA", "AGCCAA"]
+        profile(motifs, 6)
 
 
 if __name__ == "__main__":
