@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from patterncount import number_to_pattern, hamming_distance, symbol_to_number
 
 
@@ -7,7 +8,7 @@ def make_counts(motifs, k, pseudo_count=0):
     for motif in motifs:
         for i in range(k):
             current_nuc = motif[i]
-            j = symbol_to_number(current_nuc)
+            j = symbol_to_number(current_nuc.upper())
             counts[i][j] += 1
     return counts
 
@@ -20,7 +21,7 @@ def profile(motifs, k):
     for i in range(k):
         for j in range(4):
             profile[i][j] = counts[i][j] / (t + 4 * pseudo_count)
-    
+
     return profile
 
 
@@ -73,7 +74,7 @@ def probability(motif_profile, pattern, k):
     prob = 1
     for i in range(k):
         symbol = pattern[i]
-        j = symbol_to_number(symbol)
+        j = symbol_to_number(symbol.upper())
         symbol_probability = motif_profile[i][j]
         prob *= symbol_probability
     return prob
@@ -90,6 +91,27 @@ def most_probable_k_mer(motif_profile, sequence, k):
             max_prob = prob
             max_pattern = pattern
     return max_pattern
+
+
+def greedy_motif_search(dna, k, t):
+    best_motifes = [sequence[:k] for sequence in dna]
+    best_score = score(best_motifes, k)
+
+    first_sequence = dna[0]
+    for i in range(len(first_sequence) - k + 1):
+        motif_1 = first_sequence[i : i + k]
+        motifs = [motif_1]
+        for j in range(1, t):
+            motif_profile = profile(motifs, k)
+            motif_i = most_probable_k_mer(motif_profile, dna[j], k)
+            motifs.append(motif_i)
+
+        current_score = score(motifs, k)
+        if current_score < best_score:
+            best_score = current_score
+            best_motifes = deepcopy(motifs)
+
+    return best_motifes
 
 
 class TestMedianStringSearch(unittest.TestCase):
@@ -135,6 +157,14 @@ class TestMedianStringSearch(unittest.TestCase):
             most_probable_k_mer(
                 motif_profile, "CTCCAATGTGTGCTCCAACTCCAACTCCAACTCCAA", k
             ),
+        )
+
+    def test_greedy_motif_search(self):
+        dna = ["ttACCTtaac", "gATGTctgtc", "acgGCGTtag", "ccctaACGAg", "cgtcagAGGT"]
+
+        self.assertEqual(
+            ["ACCT", "ATGT", "acgG", "ACGA", "AGGT"],
+            greedy_motif_search(dna, 4, len(dna)),
         )
 
 
