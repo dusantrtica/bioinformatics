@@ -20,7 +20,8 @@ def profile(motifs, k):
     for i in range(k):
         for j in range(4):
             profile[i][j] = counts[i][j] / (t + 4 * pseudo_count)
-    print(profile)
+    
+    return profile
 
 
 def score(motifs, k):
@@ -78,6 +79,19 @@ def probability(motif_profile, pattern, k):
     return prob
 
 
+def most_probable_k_mer(motif_profile, sequence, k):
+    n = len(sequence)
+    max_prob = float("-inf")
+    max_pattern = None
+    for i in range(n - k + 1):
+        pattern = sequence[i : i + k]
+        prob = probability(motif_profile, pattern, k)
+        if prob > max_prob:
+            max_prob = prob
+            max_pattern = pattern
+    return max_pattern
+
+
 class TestMedianStringSearch(unittest.TestCase):
     def test_d(self):
         dna_sequence = [
@@ -110,6 +124,18 @@ class TestMedianStringSearch(unittest.TestCase):
     def test_profile(self):
         motifs = ["ATGCAA", "CTCCAA", "AGCCAA"]
         profile(motifs, 6)
+
+    def test_most_probable_k_mer(self):
+        motifs = ["ATGCAAATGCAAATGCAA", "CTCCAACTCCAACTCCAA", "AGCCAAAGCCAAAGCCAA"]
+        k = len(motifs[0])
+        motif_profile = profile(motifs, k)
+
+        self.assertEqual(
+            "CTCCAACTCCAACTCCAA",
+            most_probable_k_mer(
+                motif_profile, "CTCCAATGTGTGCTCCAACTCCAACTCCAACTCCAA", k
+            ),
+        )
 
 
 if __name__ == "__main__":
