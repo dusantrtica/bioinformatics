@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+import random
 from patterncount import number_to_pattern, hamming_distance, symbol_to_number
 
 
@@ -114,6 +115,36 @@ def greedy_motif_search(dna, k, t):
     return best_motifes
 
 
+def motifs_from_profile(motif_profile, dna, k):
+    motifs = []
+    for sequence in dna:
+        motif_i = most_probable_k_mer(motif_profile, sequence, k)
+        motifs.append(motif_i)
+    return motifs
+
+
+def randomized_motif_search(dna, k, t):
+    motifs = []
+    for sequence in dna:
+        n = len(sequence)
+        i = random.randrange(0, n - k + 1)
+        motifs.append(sequence[i : i + k])
+
+    best_motifs = deepcopy(motifs)
+    best_score = score(best_motifs, k)
+
+    while True:
+        motif_profile = profile(motifs, k)
+        motifs = motifs_from_profile(motif_profile, dna, k)
+
+        current_score = score(motifs, k)
+        if current_score < best_score:
+            best_score = current_score
+            best_motifs = deepcopy(motifs)
+        else:
+            return best_motifs
+
+
 class TestMedianStringSearch(unittest.TestCase):
     def test_d(self):
         dna_sequence = [
@@ -165,6 +196,14 @@ class TestMedianStringSearch(unittest.TestCase):
         self.assertEqual(
             ["ACCT", "ATGT", "acgG", "ACGA", "AGGT"],
             greedy_motif_search(dna, 4, len(dna)),
+        )
+
+    def test_randomized_motif_search(self):
+        dna = ["ttACCTtaac", "gATGTctgtc", "acgGCGTtag", "ccctaACGAg", "cgtcagAGGT"]
+
+        self.assertEqual(
+            ["ACCT", "ATGT", "acgG", "ACGA", "AGGT"],
+            randomized_motif_search(dna, 4, len(dna)),
         )
 
 
