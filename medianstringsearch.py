@@ -143,6 +143,57 @@ def randomized_motif_search(dna, k, t):
             best_motifs = deepcopy(motifs)
         else:
             return best_motifs
+        
+def most_probable_gibbs_k_mer(motif_profile, sequence, k):
+    probabilities = []
+    patterns = []
+    kmers = []
+    prob_sum = 0
+
+    n = len(sequence)
+    for i in range(n-k+1):
+        pattern = sequence[i:i+k]
+        prob = probability(motif_profile, pattern, k)
+        prob_sum += prob
+        patterns.append(pattern)
+        probabilities.append(prob)
+
+    
+    random_pos = random.random() * prob_sum
+
+    current_sum = 0
+    for i in range(n - k + 1):
+        prob = probabilities[i]
+        current_sum += prob
+        if current_sum >= random_pos:
+            return patterns[i]
+        
+
+        
+def gibbs_sampler(dna, k, t, N):
+    motifs = []
+    for sequence in dna:
+        n = len(sequence)
+        i = random.randrange(0, n - k + 1)
+        motifs.append(sequence[i : i + k])
+
+    best_motifs = deepcopy(motifs)
+    best_score = score(best_motifs, k)
+
+    for _ in range(N):
+        i = random.randrange(0, t)
+        del motifs[i]
+
+        motifs_profile = profile(motifs, k)
+        motifs_i = most_probable_gibbs_k_mer(motifs_profile, dna[i], k)
+        motifs.insert(i, motifs_i)
+
+        current_score = score(motifs, k)
+        if current_score < best_score:
+            best_score = current_score
+            best_motifes = deepcopy(motifs)
+
+    return best_motifs
 
 
 class TestMedianStringSearch(unittest.TestCase):
@@ -201,11 +252,17 @@ class TestMedianStringSearch(unittest.TestCase):
     def test_randomized_motif_search(self):
         dna = ["ttACCTtaac", "gATGTctgtc", "acgGCGTtag", "ccctaACGAg", "cgtcagAGGT"]
 
+        print(randomized_motif_search(dna, 4, len(dna)))
+
+    def test_gibbs_sampler(self):
+        dna = ["ttACCTtaac", "gATGTctgtc", "acgGCGTtag", "ccctaACGAg", "cgtcagAGGT"]
+        N = 10
+
         self.assertEqual(
             ["ACCT", "ATGT", "acgG", "ACGA", "AGGT"],
-            randomized_motif_search(dna, 4, len(dna)),
-        )
 
+            gibbs_sampler(dna, 4, len(dna), N), 
+        )
 
 if __name__ == "__main__":
     unittest.main()
