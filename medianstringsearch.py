@@ -143,7 +143,8 @@ def randomized_motif_search(dna, k, t):
             best_motifs = deepcopy(motifs)
         else:
             return best_motifs
-        
+
+
 def most_probable_gibbs_k_mer(motif_profile, sequence, k):
     probabilities = []
     patterns = []
@@ -151,14 +152,13 @@ def most_probable_gibbs_k_mer(motif_profile, sequence, k):
     prob_sum = 0
 
     n = len(sequence)
-    for i in range(n-k+1):
-        pattern = sequence[i:i+k]
+    for i in range(n - k + 1):
+        pattern = sequence[i : i + k]
         prob = probability(motif_profile, pattern, k)
         prob_sum += prob
         patterns.append(pattern)
         probabilities.append(prob)
 
-    
     random_pos = random.random() * prob_sum
 
     current_sum = 0
@@ -167,9 +167,8 @@ def most_probable_gibbs_k_mer(motif_profile, sequence, k):
         current_sum += prob
         if current_sum >= random_pos:
             return patterns[i]
-        
 
-        
+
 def gibbs_sampler(dna, k, t, N):
     motifs = []
     for sequence in dna:
@@ -260,9 +259,9 @@ class TestMedianStringSearch(unittest.TestCase):
 
         self.assertEqual(
             ["ACCT", "ATGT", "acgG", "ACGA", "AGGT"],
-
-            gibbs_sampler(dna, 4, len(dna), N), 
+            gibbs_sampler(dna, 4, len(dna), N),
         )
+
 
 if __name__ == "__main__":
     unittest.main()
