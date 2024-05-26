@@ -1,12 +1,15 @@
 from copy import deepcopy
+from random import random
 
 
 class Graph:
     def __init__(self, adjacency_list):
-        self.adjacency_list = adjacency_list
+        self.adjacency_list = deepcopy(adjacency_list)
 
     def __str__(self):
         return f"{self.adjacency_list}"
+
+    """Returns list of neighbors for a given node"""
 
     def get_neighbors(self, node):
         return self.adjacency_list[node]
@@ -44,10 +47,12 @@ class Graph:
 
     def inbound_edges(self, node):
         edges = []
-        for key, neighbors in self.adjacency_list:
+        for key, neighbors in self.adjacency_list.items():
             for neighbor in neighbors:
                 if neighbor == node:
                     edges.append((key, node))
+
+        return edges
 
     def get_all_edges(self):
         all_edges = []
@@ -98,8 +103,155 @@ class Graph:
 
         return cycle
 
+    def add_neighbor(self, node, neighbor):
+        self.adjacency_list[node].append(neighbor)
 
-class DeBrujin(Graph):
+    def bypass(self, u, v, w):
+        x = f"{v}-{random()}"
+
+        self.adjacency_list[u].remove(v)
+        self.adjacency_list[v].remove(w)
+        self.add_node(x)
+
+        self.add_neighbor(u, x)
+        self.add_neighbor(x, w)
+
+    """Checks whether the graph is simple - is simple there is no node
+    which has more than one inbound edge"""
+
+    def is_simple(self):
+        for key in self.adjacency_list.keys():
+            if self.in_degree(key) > 1:
+                return False
+        return True
+
+    """Does DFS for every single node and checks if all nodes are accessible from that one"""
+
+    def is_connected(self):
+        total_num_nodes = len(self.adjacency_list)
+        for key in self.adjacency_list:
+            stack = [key]
+            visited = set([])
+
+            while len(stack) > 0:
+                node = stack[-1]
+                visited.add(node)
+                has_unvisited_neighbor = False
+                for neighbor in self.get_neighbors(node):
+                    if neighbor not in visited:
+                        has_unvisited_neighbor = True
+                        stack.append(neighbor)
+
+                if not has_unvisited_neighbor:
+                    stack.pop()
+
+            if len(visited) != total_num_nodes:
+                return False
+
+        return True
+
+    def get_unbalanced(self):
+        unbalanced = []
+        for key in self.adjacency_list:
+            if self.in_degree(key) != self.out_degree(key):
+                unbalanced.append(key)
+
+        return unbalanced
+
+    def close_to_cycle(self):
+        [u, v] = self.get_unbalanced()
+        if self.in_degree(u) > self.out_degree(u):
+            self.add_neighbor(u, v)
+        else:
+            self.add_neighbor(v, u)
+
+    def all_eulerian_cycles(self):
+        all_graphs = [self]
+        while True:
+            non_simple_g = None
+            for g in all_graphs:
+                if not g.is_simple():
+                    non_simple_g = g
+                    break
+            if non_simple_g == None:
+                break
+
+            non_simple_node = None
+            # trazimo ulazni cvor koji ima stepen veci od jedan
+            # sad ga bajpasujemo, tj. izravnavamo ga
+            for key in non_simple_g.adjacency_list.keys():
+                if non_simple_g.in_degree(key) > 1:
+                    non_simple_node = key
+
+            inbound_e = non_simple_g.inbound_edges(non_simple_node)
+            outbound_e = non_simple_g.outbound_edges(non_simple_node)
+
+            for u, v in inbound_e:
+                for v, w in outbound_e:
+                    if u == v and u == w:
+                        continue  # grana koja ide u isti cvor, preskacemo.
+                    new_graph = Graph(deepcopy(non_simple_g.adjacency_list))
+                    new_graph.bypass(u, v, w)
+
+                    if new_graph.is_connected():
+                        all_graphs.append(new_graph)
+
+            all_graphs.remove(non_simple_g)
+
+        cycles = []
+        for g in all_graphs:
+            cycle = g.eulerian_cycle()
+            cycles.append(tuple([node.split("-")[0] for node in cycle]))
+
+        deduplicated_cycles = set(cycles)
+
+        return [list(cycle) for cycle in deduplicated_cycles]
+
+    def maximal_non_branching_paths(self):
+        paths = []
+        visited = set([])
+        for v in self.adjacency_list:
+            # 1 in, 1 out
+            v_in_deg = self.in_degree(v)
+            v_out_deg = self.out_degree(v)
+            if not (v_in_deg == 1 and v_out_deg) == 1:
+                # konstruisemo putanju od ovog cvora, koji nije 1-1
+                if v_out_deg > 0:
+                    for v, w in self.outbound_edges(v):
+                        non_branching_path = [v, w]
+                        visited.add(v)
+                        w_in_deg = self.in_degree(w)
+                        w_out_deg = self.out_degree(w)
+
+                        while w_in_deg == 1 and w_out_deg == 1:
+                            [(w, u)] = self.outbound_edges(w)
+                            non_branching_path.append(u)
+
+                            visited.add(w)
+                            w = u
+                            w_in_deg = self.in_degree(w)
+                            w_out_deg = self.out_degree(w)
+
+                        paths.append(non_branching_path)
+
+        for v in self.adjacency_list:
+            if v not in visited:
+                visited.add(v)
+
+                non_branching_path = [v]
+                neighbor = self.outbound_edges(v)
+                while neighbor != None and neighbor[1] not in visited:
+                    w = neighbor[1]
+                    non_branching_path.append(w)
+                    visited.add(w)
+                    neighbor = self.outbound_edges(w)
+
+                paths.append(non_branching_path)
+
+        return paths
+
+
+class DeBruijn(Graph):
     def __init__(self, reads, k):
         kmers = self.get_kmers(reads, k)  # array of triples
         adjacency_list = {}
@@ -111,11 +263,11 @@ class DeBrujin(Graph):
                 adjacency_list[u] = []
 
             if v not in adjacency_list:
-                adjacency_list[u] = []
+                adjacency_list[v] = []
 
             adjacency_list[u].append(v)
 
-        super().__init__(adjacency_list=adjacency_list)
+        super().__init__(adjacency_list)
 
     def get_kmers(self, reads, k):
         kmers = []
@@ -130,7 +282,7 @@ class DeBrujin(Graph):
 import unittest
 
 
-class TestDebrujin(unittest.TestCase):
+class TestDeBruijn(unittest.TestCase):
 
     def make_graph(self):
         G = {
@@ -152,6 +304,18 @@ class TestDebrujin(unittest.TestCase):
             g.eulerian_cycle(),
         )
 
+    def test_de_bruijn_cycles(self):
+        reads = ["TAATGCCATGGGATGTT"]
+        dg = DeBruijn(reads, k=3)
+        dg.close_to_cycle()
+        # print(dg.all_eulerian_cycles())
+        print("Maximal Non Branching Paths: ")
+        print(dg.maximal_non_branching_paths())
+
+    def test_all_eulerian_cycles(self):
+        g = Graph(self.make_graph())
+        # print(g.all_eulerian_cycles())
+
     def test_out_degree(self):
         g = Graph(self.make_graph())
         self.assertEqual(2, g.out_degree("G"))
@@ -172,7 +336,7 @@ class TestDebrujin(unittest.TestCase):
 
     def test_debrujin(self):
         reads = ["AATT"]
-        dg = DeBrujin(reads=reads, k=3)
+        dg = DeBruijn(reads=reads, k=3)
         self.assertEqual("{'AA': ['AT'], 'AT': ['TT']}", str(dg))
 
     def test_get_neighbors(self):
