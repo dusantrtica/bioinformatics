@@ -12,7 +12,7 @@ class Alignments:
                 v_align = v[i - 1] + v_align
                 w_align = w[j - 1] + w_align
 
-            if (i_new, j_new) == (i - 1, j):
+            elif (i_new, j_new) == (i - 1, j):
                 w_align = "-" + w_align
             else:
                 v_align = "-" + v_align
@@ -38,7 +38,7 @@ class Alignments:
         for i in range(1, n):
             for j in range(1, m):
                 match = self.match(v[i - 1], w[j - 1])
-                from_up = s[i - i][j] + 1
+                from_up = s[i - 1][j] + 1
                 from_left = s[i][j - 1] + 1
                 from_diag = s[i - 1][j - 1] + (1 - match)
                 s[i][j] = min(from_up, from_left, from_diag)
@@ -75,7 +75,7 @@ class Alignments:
         for i in range(1, n):
             for j in range(1, m):
                 match = self.match(v[i - 1], w[j - 1])
-                from_up = s[i - i][j]
+                from_up = s[i - 1][j]
                 from_left = s[i][j - 1]
                 from_diag = s[i - 1][j - 1] + match
                 s[i][j] = max(from_up, from_left, from_diag)
@@ -112,7 +112,7 @@ class TestAlignment(unittest.TestCase):
 
     def test_edit_distance(self):
         alignmnent = Alignments()
-        self.assertEqual("ABD", alignmnent.edit_distance("ABD", "ABCD"))
+        self.assertEqual("AB-D", alignmnent.edit_distance("ABD", "ABCD")[1])
 
 
 if __name__ == "__main__":
