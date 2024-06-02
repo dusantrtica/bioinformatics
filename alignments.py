@@ -1,8 +1,12 @@
 class Alignments:
-    def __init__(self, gap_penalty=-1, match_score=1, missmatch_penalty=0):
+    def __init__(
+        self, gap_penalty=-1, match_score=1, missmatch_penalty=0, sigma=-1, eps=-0.5
+    ):
         self.GAP_PENALTY = gap_penalty
         self.MATCH_SCORE = match_score
         self.MISSMATCH_PENALTY = missmatch_penalty
+        self.SIGMA = sigma
+        self.EPS = eps
 
     def match(self, x, y):
         return int(x == y)
@@ -131,10 +135,10 @@ class Alignments:
 
                 if s[i][j] == from_diag:
                     backtrack[i][j] = (i - 1, j - 1)
-                elif s[i][j] == from_left:
-                    backtrack[i][j] = (i, j - 1)
-                else:
+                elif s[i][j] == from_up:
                     backtrack[i][j] = (i - 1, j)
+                else:
+                    backtrack[i][j] = (i, j - 1)
 
         v_align, w_align = self.backtracking(backtrack, v, w, n - 1, m - 1, s)
         return s[n - 1][m - 1], v_align, w_align
@@ -187,11 +191,146 @@ class Alignments:
 
         return (max_score, v_align, w_align)
 
+    def needleman_wunsch_last_line(self, v, w):
+        n = len(v) + 1
+        m = len(w) + 1
+
+        s = [[0 for _ in range(m)] for _ in range(2)]
+        # inicijalizacija
+        for j in range(m):
+            s[0][j] = j * self.GAP_PENALTY
+
+        for i in range(1, n):
+            s[1][0] = i * self.GAP_PENALTY
+
+            for j in range(1, m):
+                match = self.match(v[i - 1], w[j - 1])
+                match_score = 0
+                if match == 1:
+                    match_score = self.MATCH_SCORE
+                else:
+                    match_score = self.MISSMATCH_PENALTY
+
+                from_up = s[0][j] + self.GAP_PENALTY
+                from_left = s[1][j - 1] + self.GAP_PENALTY
+                from_diag = s[0][j - 1] + match_score
+
+                s[1][j] = max(from_diag, from_up, from_left)
+
+            s[0][:] = s[1][:]
+        return s[1]
+
+    def hirschberg(self, v, w):
+        v_align = ""
+        w_align = ""
+        n = len(v)
+        m = len(w)
+
+        if n == 0:
+            v_align = m * "-"
+            w_align = w
+        elif m == 0:
+            v_align = v
+            w_align = n * "-"
+        elif n == 1 or m == 1:
+            _, v_align, w_align = self.needleman_wunsch(v, w)
+        else:
+            x_mid = n // 2
+            score_l = self.needleman_wunsch_last_line(v[:x_mid], w)
+            score_r = self.needleman_wunsch_last_line(v[x_mid:][::-1], w[::-1])[::-1]
+
+            max_score = float("-inf")
+            y_mid = None  # Max score indx
+
+            for i in range(m):
+                curr_score = score_l[i] + score_r[i]
+                if curr_score > max_score:
+                    max_score = curr_score
+                    y_mid = i
+
+            v1_align, w1_align = self.hirschberg(v[:x_mid], w[:y_mid])
+            v2_align, w2_align = self.hirschberg(v[x_mid:], w[y_mid:])
+
+            v_align = v1_align + v2_align
+            w_align = w1_align + w2_align
+
+        return v_align, w_align
+
+    def affine_gap_penaly_alignment(self, v, w):
+        n = len(v) + 1
+        m = len(w) + 1
+        middle = [[0 for _ in range(m)] for _ in range(n)]
+        upper = [[0 for _ in range(m)] for _ in range(n)]
+        lower = [[0 for _ in range(m)] for _ in range(n)]
+
+        backtrack = [[None for _ in range(m)] for _ in range(n)]
+
+        # initialization
+        for i in range(1, n):
+            backtrack[i][0] = (i - 1, 0)
+
+        for j in range(1, m):
+            backtrack[0][j] = (0, j - 1)
+
+        for i in range(1, n):
+            for j in range(1, m):
+                match = self.match(v[i - 1], w[j - 1])
+                match_score = 0
+                if match == 1:
+                    match_score = self.MATCH_SCORE
+                else:
+                    match_score = self.MISSMATCH_PENALTY
+
+                lower[i][j] = max(
+                    lower[i - 1][j] + self.EPS, middle[i - 1][j] + self.SIGMA
+                )
+                upper[i][j] = max(
+                    upper[i][j - 1] + self.EPS, middle[i][j - 1] + self.SIGMA
+                )
+
+                middle[i][j] = max(
+                    middle[i - 1][j - 1] + match_score, lower[i][j], upper[i][j]
+                )
+
+                if middle[i][j] == middle[i - 1][j - 1] + match_score:  # from_diag
+                    backtrack[i][j] = (i - 1, j - 1)
+                elif middle[i][j] == lower[i][j]:
+                    backtrack[i][j] = (i - 1, j)
+                else:
+                    backtrack[i][j] = (i, j - 1)
+
+        v_align, w_align = self.backtracking(
+            backtrack, v, w, n - 1, m - 1, middle, None
+        )
+        print(backtrack)
+        return middle[n - 1][m - 1], v_align, w_align
+
 
 import unittest
 
 
 class TestAlignment(unittest.TestCase):
+    def test_affine_gap_penaly_alignment(self):
+        al = Alignments(gap_penalty=-2, match_score=2, missmatch_penalty=-1)
+        v = "AGTACGCA"
+        w = "TATGC"
+        self.assertEqual(
+            (6, "ACTACGC", "--TATGC-"), al.affine_gap_penaly_alignment(v, w)
+        )
+
+    def test_hirschberg(self):
+        alignment = Alignments(-2, 2, -1)
+        v = "AGTACGCA"
+        w = "TATGC"
+        self.assertEqual(("AGTACGC", "--TATGC-"), alignment.hirschberg(v, w))
+
+    def test_needleman_wunsch_last_line(self):
+        alignments = Alignments(gap_penalty=-1, match_score=1, missmatch_penalty=0)
+        v = "ABCAD"
+        w = "ABDE"
+        self.assertEqual(
+            [-5, -3, -1, 1, 1], alignments.needleman_wunsch_last_line(v, w)
+        )
 
     def test_smith_waterman(self):
         alignments = Alignments(gap_penalty=-1, match_score=1, missmatch_penalty=0)
@@ -211,6 +350,13 @@ class TestAlignment(unittest.TestCase):
         w = "ABDE"
 
         self.assertEqual((1, "ABAD", "AB-DE"), alignments.needleman_wunsch(v, w))
+
+    def test_needleman_wunsch_from_wiki_example(self):
+        alignments = Alignments(gap_penalty=-2, match_score=2, missmatch_penalty=-1)
+        v = "AGTACGCA"
+        w = "TATGC"
+
+        self.assertEqual((1, "TACGC", "--TATGC-"), alignments.needleman_wunsch(v, w))
 
     def test_lcs_backtrack(self):
         alignmnent = Alignments()
