@@ -3,6 +3,8 @@ class Graph:
         self.adjacency_list = adjacency_list
 
     def add_neighbor(self, v, w, distance):
+        if v not in self.adjacency_list:
+            self.adjacency_list[v] = []
         self.adjacency_list[v].append((w, distance))
         self.adjacency_list[w] = [(v, distance)]
 
@@ -11,6 +13,10 @@ class Graph:
 
     def __str__(self) -> str:
         return f"{self.adjacency_list}"
+
+    def add_node(self, v):
+        if v not in self.adjacency_list:
+            self.adjacency_list[v] = []
 
     def find_path(self, source, destination):
         stack = [source]
@@ -77,6 +83,28 @@ class Graph:
             return self.add_vertex_on_edge(v_i, v_j, local_distance_i, local_distance_j)
 
 
+class Cluster:
+    def __init__(self, elements=[], age=0):
+        self.age = age
+        self.elements = elements
+
+    def __str__(self):
+        return f"{self.elements}"
+
+    def merge(self, other_cluster):
+        c_new = Cluster(elements=self.elements + other_cluster.elements)
+        return c_new
+
+    def distance(self, other_cluster, D):
+        total_distance = 0
+        for e_i in self.elements:
+            for e_j in other_cluster.elements:
+                d_ij = D[e_i][e_j]
+                total_distance += d_ij
+
+        return total_distance / (len(self.elements) + len(other_cluster.elements))
+
+
 class Phylogeny:
     def limb(self, D, n):
         # To find nodes i and k, such that dik + dnk = din
@@ -114,6 +142,44 @@ class Phylogeny:
         T.add_neighbor(v, n - 1, limb_length)
         return T
 
+    def two_closest_clusters(self, clusters, D):
+        min_ci = None
+        min_cj = None
+        min_distance = float("inf")
+
+        for c_i in clusters:
+            for c_j in clusters:
+                if c_i != c_j:
+                    current_disance = c_i.distance(c_j, D)
+                    if current_disance < min_distance:
+                        min_distance = current_disance
+                        min_ci = c_i
+                        min_cj = c_j
+
+        return min_ci, min_cj, min_distance
+
+    def UPGMA(self, D, n):
+        clusters = [Cluster([i], 0) for i in range(n)]
+        adjacency_list = dict([(i, []) for i in range(n)])
+        T = Graph(adjacency_list)
+
+        while len(clusters) > 1:
+            c_i, c_j, dist = self.two_closest_clusters(clusters, D)
+            c_new = c_i.merge(c_j)
+            c_new.age = dist / 2
+            T.add_node(str(c_new))
+            T.add_neighbor(str(c_new), str(c_i), c_new.age - c_i.age)
+            T.add_neighbor(str(c_new), str(c_j), c_new.age - c_j.age)
+
+            clusters = [
+                cluster for cluster in clusters if cluster != c_i and cluster != c_j
+            ]
+            clusters.append(c_new)
+
+        root = str(clusters[0])
+
+        return T, root
+
 
 import unittest
 
@@ -142,6 +208,13 @@ class TestPhylogeny(unittest.TestCase):
         n = len(D)
         t = ph.additive_phylogeny(D, n)
         print(t)
+
+    def test_UPGMA(self):
+        D = [[0, 3, 4, 3], [3, 0, 4, 5], [4, 4, 0, 2], [3, 5, 2, 0]]
+        n = len(D)
+        ph = Phylogeny()
+        T, root = ph.UPGMA(D, n)
+        print(T, root)
 
 
 if __name__ == "__main__":
