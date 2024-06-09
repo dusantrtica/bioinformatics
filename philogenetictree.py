@@ -105,6 +105,82 @@ class Cluster:
         return total_distance / (len(self.elements) + len(other_cluster.elements))
 
 
+class DMap:
+    def __init__(self, D):
+        self.d = D
+        self.d_map = {}
+        self.n = len(D)
+        for i in range(self.n):
+            self.d_map[i] = {}
+            for j in range(self.n):
+                self.d_map[i][j] = D[i][j]
+
+    def __str__(self):
+        return f"{self.d_map}"
+
+    def total_distance(self, i):
+        dist = 0
+
+        for j in self.d_map:
+            dist += self.d_map[i][j]
+
+        return dist
+
+    def d_star(self):
+        d_s = {}
+
+        for i in self.d_map:
+            d_s[i] = {}
+            for j in self.d_map[i]:
+
+                d_s[i][j] = (
+                    (
+                        (self.n - 2) * self.d_map[i][j]
+                        - self.total_distance(i)
+                        - self.total_distance(j)
+                    )
+                    if i != j
+                    else 0
+                )
+        return d_s
+
+    def min_d_star_dis(self):
+        d_s = self.d_star()
+
+        min_i = None
+        min_j = None
+        min_distance = float("inf")
+
+        for i in d_s:
+            for j in d_s:
+                if i != j:
+                    current_distance = d_s[i][j]
+                    if current_distance < min_distance:
+                        min_i = i
+                        min_j = j
+
+        return min_i, min_j
+
+    def remove_node(self, i):
+        del self.d_map[i]
+
+        for j in self.d_map:
+            if j != i and i in self.d_map[j]:
+                del self.d_map[j][i]
+
+    def add_node(self, m, i, j):
+        self.d_map[m] = {}
+        for k in self.d_map:
+            if k != i and k != j:
+                if k != m:
+                    self.d_map[k][m] = 0.5 * (
+                        self.d_map[k][i] + self.d_map[k][j] - self.d_map[i][j]
+                    )
+                    self.d_map[m][k] = self.d_map[k][m]
+                else:
+                    self.d_map[m][k] = 0
+
+
 class Phylogeny:
     def limb(self, D, n):
         # To find nodes i and k, such that dik + dnk = din
@@ -180,6 +256,28 @@ class Phylogeny:
 
         return T, root
 
+    def neighbor_joining(self, D, n):
+        if n == 2:
+            i, j = list(D.d_map.keys())
+            return Graph({i: [(j, D.d_map[i][j])], j: [(i, D.d_map[j][i])]})
+
+        i, j = D.min_d_star_dis()
+
+        delta = (D.total_distance(i) - D.total_distance(j)) / (n - 2)
+        limb_length_i = 0.5 * (D.d_map[i][j] + delta)
+        limb_length_j = 0.5 * (D.d_map[i][j] + delta)
+
+        m = f"X{i},{j}"
+        D.add_node(m, i, j)
+        D.remove_node(i)
+        D.remove_node(j)
+
+        T = self.neighbor_joining(D, n - 1)
+        T.add_neighbor(m, i, limb_length_i)
+        T.add_neighbor(m, j, limb_length_j)
+
+        return T
+
 
 import unittest
 
@@ -215,6 +313,20 @@ class TestPhylogeny(unittest.TestCase):
         ph = Phylogeny()
         T, root = ph.UPGMA(D, n)
         print(T, root)
+
+    def test_d_map(self):
+        D = [[0, 13, 21, 22], [13, 0, 12, 13], [21, 12, 0, 13], [22, 13, 13, 0]]
+
+        d_map = DMap(D)
+        d_s = d_map.d_star()
+
+    def test_neighbor_joining(self):
+        ph = Phylogeny()
+        D = [[0, 13, 21, 22], [13, 0, 12, 13], [21, 12, 0, 13], [22, 13, 13, 0]]
+        d_map = DMap(D)
+        n = len(D)
+        print("Neighbor joining: ")
+        print(ph.neighbor_joining(d_map, n))
 
 
 if __name__ == "__main__":
