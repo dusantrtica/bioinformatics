@@ -82,6 +82,53 @@ class SuffixArray:
 
         return sorted(arr)
 
+    def compare(self, pattern, suffix):
+        n = len(pattern)
+        m = len(suffix)
+
+        if n > m:
+            return 1
+
+        suffix_pref = suffix[:n]
+        if suffix_pref == pattern:
+            return 0
+
+        if suffix_pref < pattern:
+            return 1
+        else:
+            return -1
+
+    def pattern_matching_with_suffix_array(self, pattern):
+        n = len(self.arr)
+
+        min_index = 0
+        max_index = n
+
+        while min_index <= max_index:
+            mid_index = (min_index + max_index) // 2
+
+            current_suffix = self.arr[mid_index][0]
+            compare_res = self.compare(pattern, current_suffix)
+            if compare_res == 0:
+                i = mid_index
+                while i >= 0 and self.compare(pattern, self.arr[i][0]) == 0:
+                    i -= 1
+
+                i += 1
+
+                j = mid_index
+                while j < n and self.compare(pattern, self.arr[j][0]) == 0:
+                    j += 1
+
+                return [self.arr[k][1] for k in range(i, j)]
+
+            elif compare_res < 0:
+                max_index = mid_index
+            else:
+                min_index = mid_index
+
+        return []
+
 
 import unittest
 
@@ -149,6 +196,16 @@ class TestSuffixArray(unittest.TestCase):
         text = "PANANABANANAS"
         sa = SuffixArray(text)
         print(sa.arr)
+
+    def test_compare(self):
+        sa = SuffixArray([])
+        self.assertEqual(0, sa.compare("aaa", "aaa"))
+        self.assertEqual(0, sa.compare("aaa", "aaaa"))
+        self.assertEqual(1, sa.compare("aab", "aaab"))
+
+    def test_pattern_matching_with_suffix_array(self):
+        suff_arr = SuffixArray("panamabananas")
+        self.assertEqual([6], suff_arr.pattern_matching_with_suffix_array("banana"))
 
 
 if __name__ == "__main__":
