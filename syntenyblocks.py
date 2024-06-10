@@ -11,6 +11,9 @@ class GenomeGraph:
             self.adjacency_list[u].append(v)
             self.adjacency_list[v].append(u)
 
+    def __str__(self) -> str:
+        return f"{self.adjacency_list}"
+
     def get_cycles(self):
         unvisited = set(self.adjacency_list.keys())
         cycles = []
@@ -138,6 +141,47 @@ class Reversals:
         genome_graph.two_break_on_genome_graph(i, i_p, j, j_p)
         return self.graph_to_genome(genome_graph)
 
+    def shortest_rearrangement_scenario(self, P, Q):
+        red_edges = self.colored_edges(P)
+        blue_edges = self.colored_edges(Q)
+
+        breakpoint_graph = GenomeGraph(red_edges + blue_edges)
+
+        while True:
+            cycles = breakpoint_graph.get_cycles()
+            non_trivial_cycle = None
+            for cycle in cycles:
+                if len(cycle) > 2:
+                    non_trivial_cycle = cycle
+            if non_trivial_cycle == None:
+                break
+
+            n = len(non_trivial_cycle)
+            cycle_edges = [
+                (non_trivial_cycle[i], non_trivial_cycle[i + 1]) for i in range(n - 1)
+            ] + [(non_trivial_cycle[-1], non_trivial_cycle[0])]
+
+            for k in range(n):
+                edge = cycle_edges[k]
+                (j_blue, i_p_blue) = edge
+                if (j_blue, i_p_blue) in blue_edges or (i_p_blue, j_blue) in blue_edges:
+                    previous_red_edge = cycle_edges[(k - 1) % n]
+                    next_red_edge = cycle_edges[(k + 1) % n]
+                    break
+
+            (i, j) = previous_red_edge
+
+            (i_p, j_p) = next_red_edge
+
+            breakpoint_graph.remove_edge(i, j)
+            breakpoint_graph.remove_edge(i_p, j_p)
+
+            breakpoint_graph.add_edge(j, i_p)
+            breakpoint_graph.add_edge(j_p, i)
+
+            P = self.two_break_on_genome(P, j, i, i_p, j_p)
+        return P
+
 
 import unittest
 
@@ -163,6 +207,13 @@ class TestGenomeGraph(unittest.TestCase):
 
 
 class TestReversals(unittest.TestCase):
+    def test_shortest_rearrangement_scenario(self):
+        P = [[1, -2, -3, 4]]
+        Q = [[1, 2, 3, 4]]
+        rev = Reversals()
+        P_p = rev.shortest_rearrangement_scenario(P, Q)
+        self.assertEqual(Q, P_p)
+
     def test_two_break_on_genome(self):
         P = [[1, -2, -3, 4]]
         revs = Reversals()
