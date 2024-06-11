@@ -130,7 +130,98 @@ class SuffixArray:
         return []
 
 
+class BWT:
+    def __init__(self, text):
+        self.bwt_text = self.construct_bwt(text + "$")
+
+    def construct_bwt(self, text):
+        # matrica ciklicnih permutacija i da izvucemo poslednju kolonu
+        n = len(text)
+        permutations = [text[i:n] + text[:i] for i in range(n)]
+        return "".join([x[-1] for x in sorted(permutations)])
+
+    def inverse_bwt(self):
+        last_column = list(self.bwt_text)
+        columns = sorted(last_column[:])
+        orignal_row = last_column.index("$")
+        n = len(last_column)
+        for _ in range(n - 1):
+            for j in range(n):
+                columns[j] = last_column[j] + columns[j]
+            columns.sort()
+
+        return columns[orignal_row][:-1]
+
+    def last_to_first(self, last_col_index):
+        last_column = list(self.bwt_text)
+        first_column = sorted(last_column[:])
+
+        last_col_char = last_column[last_col_index]
+        n = len(last_column)
+        rank = 0
+        for i in range(last_col_index + 1):
+            if last_column[i] == last_col_char:
+                rank += 1
+
+        count = 0
+        for i in range(n):
+            if first_column[i] == last_col_char:
+                count += 1
+            if count == rank:
+                return i
+
+    def bw_matching(self, pattern):
+        n = len(self.bwt_text)
+        last_column = list(self.bwt_text)
+
+        top = 0
+        bottom = n - 1
+
+        j = len(pattern) - 1
+        while top <= bottom:
+            if j < 0:
+                return bottom - top + 1
+            symbol = pattern[j]
+            j -= 1
+            if symbol in last_column[top : bottom + 1]:
+                first_index = None
+                last_index = None
+
+                for i in range(top, bottom + 1):
+                    if symbol == last_column[i]:
+                        if first_index == None:
+                            first_index = i
+                        last_index = i
+                top = self.last_to_first(first_index)
+                bottom = self.last_to_first(last_index)
+
+            else:
+                return 0
+
+
 import unittest
+
+
+class TestBWT(unittest.TestCase):
+    def test_bw_matching(self):
+        bwt = BWT("panamabananas")
+        self.assertEqual(3, bwt.bw_matching("ana"))
+        self.assertEqual(1, bwt.bw_matching("ban"))
+
+    def test_last_to_first(self):
+        bwt = BWT("panamabananas")
+        print("".join(bwt.bwt_text))
+        print("".join(bwt.inverse_bwt()))
+        self.assertEqual(11, bwt.last_to_first(6))
+
+    def test_construct_bwt(self):
+        bwt = BWT("panamabananas")
+        self.assertEqual("smnpbnnaaaaa$a", bwt.bwt_text)
+
+    def test_inverse_bwt(self):
+        text = "panamabananas"
+        bwt = BWT(text)
+        self.assertEqual(text, bwt.inverse_bwt())
 
 
 class TestTrie(unittest.TestCase):
