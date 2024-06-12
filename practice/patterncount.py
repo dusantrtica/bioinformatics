@@ -130,8 +130,37 @@ def neighbors(pattern, d):
     return neighborhood
 
 
+def approximate_pattern_count(text, pattern, d):
+    count = 0
+    n = len(text)
+    k = len(pattern)
+
+    for i in range(n - k + 1):
+        if hamming_distance(pattern, text[i : i + k]) <= d:
+            count += 1
+
+    return count
+
+
 def frequent_words_with_mismatches(text, k, d):
-    return []
+    n = len(text)
+
+    max_pattern_count = 4**k
+
+    frequencies = [0 for _ in range(max_pattern_count)]
+    most_frequent_words = set([])
+
+    for i in range(n - k + 1):
+        pattern = text[i : i + k]
+        for neighbor in neighbors(pattern, d):
+            frequencies[pattern_to_number(neighbor)] += 1
+
+    max_count = max(frequencies)
+    for i in range(max_pattern_count):
+        if frequencies[i] == max_count:
+            most_frequent_words.add(number_to_pattern(i, k))
+
+    return most_frequent_words
 
 
 class PatternCount(unittest.TestCase):
@@ -209,7 +238,7 @@ class PatternCount(unittest.TestCase):
     def test_frequent_words_with_mismatches(self):
         text = "ACGTTGCACGTTACACACACAGGTTCGGATGCATGCCGTAAGCTACGT"
         self.assertEqual(
-            ["CACA", "ACGT", "ACAC"], frequent_words_with_mismatches(text, 4, 0)
+            set(["CACA", "ACGT", "ACAC"]), frequent_words_with_mismatches(text, 4, 0)
         )
 
 
