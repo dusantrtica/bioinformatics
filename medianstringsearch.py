@@ -4,6 +4,20 @@ import random
 from patterncount import number_to_pattern, hamming_distance, symbol_to_number
 
 
+def median_string(dna, k):
+    distance = float("inf")
+    median_pattern = None
+
+    for i in range(4**k):
+        pattern = number_to_pattern(i, k)
+        current_distance = d(pattern, dna)
+        if current_distance < distance:
+            distance = current_distance
+            median_pattern = pattern
+
+    return median_pattern
+
+
 def make_counts(motifs, k, pseudo_count=0):
     counts = [[pseudo_count] * 4 for _ in range(k)]
     for motif in motifs:
@@ -55,20 +69,6 @@ def d(pattern, dna):
         total_distance += min_distance
 
     return total_distance
-
-
-def median_string(dna, k):
-    distance = float("inf")
-    median_pattern = None
-
-    for i in range(4**k):
-        pattern = number_to_pattern(i, k)
-        current_distance = d(pattern, dna)
-        if current_distance < distance:
-            distance = current_distance
-            median_pattern = pattern
-
-    return median_pattern
 
 
 def probability(motif_profile, pattern, k):
