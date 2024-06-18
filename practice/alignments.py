@@ -1,4 +1,14 @@
 class Alignments:
+    def __init__(
+        self, gap_penalty=-1, match_score=1, missmatch_penalty=0, sigma=-1, eps=-0.5
+    ) -> None:
+        self.GAP_PENALTY = gap_penalty
+        self.MATCH_SCORE = match_score
+        self.MISSMATCH_PENALTY = missmatch_penalty
+        self.EPS = eps
+        self.SIGMA = sigma
+        pass
+
     def match(self, x, y):
         return int(x == y)
 
@@ -99,6 +109,54 @@ class Alignments:
 
         return v_align, w_align
 
+    def affine_gap_penaly_alignment(self, v, w):
+        n = len(v) + 1
+        m = len(w) + 1
+
+        middle = [[0 for _ in range(m)] for _ in range(n)]
+        upper = [[0 for _ in range(m)] for _ in range(n)]
+        lower = [[0 for _ in range(m)] for _ in range(n)]
+
+        backtrack = [[None for _ in range(m)] for _ in range(n)]
+
+        for i in range(1, n):
+            backtrack[i][0] = (i - 1, 0)
+
+        for j in range(1, m):
+            backtrack[0][j] = (0, j - 1)
+
+        for i in range(1, n):
+            for j in range(1, m):
+                match = self.match(v[i - 1], w[j - 1])
+                match_score = 0
+                if match == 1:
+                    match_score = self.MATCH_SCORE
+                else:
+                    match_score = self.MISSMATCH_PENALTY
+
+                lower[i][j] = max(
+                    lower[i - 1][j] + self.EPS, middle[i - 1][j] + self.SIGMA
+                )
+
+                upper[i][j] = max(
+                    upper[i][j - 1] + self.EPS, middle[i][j - 1] + self.SIGMA
+                )
+
+                middle[i][j] = max(
+                    middle[i - 1][j - 1] + match_score, lower[i][j], upper[i][j]
+                )
+
+                if middle[i][j] == middle[i - 1][j - 1] + match_score:
+                    backtrack[i][j] = (i - 1, j - 1)
+                elif middle[i][j] == lower[i][j]:
+                    backtrack[i][j] = (i - 1, j)
+                else:
+                    backtrack[i][j] = (i, j - 1)
+
+        v_align, w_align = self.backtracking(backtrack, v, w, n - 1, m - 1, 0)
+
+        return v_align, w_align
+
 
 import unittest
 
@@ -133,6 +191,15 @@ class TestAlignments(unittest.TestCase):
         v = "abd"
         w = "abcd"
         self.assertEqual(("ab-d", "abcd"), al.edit_distance(v, w))
+
+    def test_affine_gap_penalty(self):
+        al = Alignments(
+            gap_penalty=-2, match_score=2, missmatch_penalty=-2, sigma=-1, eps=-0.1
+        )
+        v = "AGTACGCA"
+        w = "TATGC"
+
+        self.assertEqual(("AGTACGCA", "--TATGC-"), al.affine_gap_penaly_alignment(v, w))
 
 
 if __name__ == "__main__":
