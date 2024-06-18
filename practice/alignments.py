@@ -53,11 +53,16 @@ class Alignments:
 
         return lcs, s[n - 1][m - 1]
 
-    def backtracking(self, backtrack, v, w, i, j, num_elements):
+    def backtracking(self, backtrack, v, w, i, j, stop=0, s=None):
         v_align = ""
         w_align = ""
 
-        while backtrack[i][j] != None:
+        while True:
+            if backtrack[i][j] == None:
+                break
+            if s is not None and s[i][j] == stop:
+                break
+
             (i_new, j_new) = backtrack[i][j]
             if (i_new, j_new) == (i - 1, j - 1):
                 v_align = v[i - 1] + v_align
@@ -109,6 +114,47 @@ class Alignments:
 
         return v_align, w_align
 
+    def needleman_wunch(self, v, w):
+        n = len(v) + 1
+        m = len(w) + 1
+
+        s = [[0 for _ in range(m)] for _ in range(n)]
+        backtrack = [[None for _ in range(m)] for _ in range(n)]
+
+        for i in range(1, n):
+            s[i][0] = i * self.GAP_PENALTY
+            backtrack[i][0] = (i - 1, 0)
+
+        for j in range(1, m):
+            s[0][j] = j * self.GAP_PENALTY
+            backtrack[0][j] = (0, j - 1)
+
+        for i in range(1, n):
+            for j in range(1, m):
+                match = self.match(v[i - 1], w[j - 1])
+                match_score = 0
+                if match == 1:
+                    match_score = self.MATCH_SCORE
+                else:
+                    match_score = self.MISSMATCH_PENALTY
+
+                from_up = s[i - 1][j] + self.GAP_PENALTY
+                from_left = s[i][j - 1] + self.GAP_PENALTY
+                from_diag = s[i - 1][j - 1] + match_score
+
+                s[i][j] = max(from_up, from_left, from_diag)
+
+                if s[i][j] == from_diag:
+                    backtrack[i][j] = (i - 1, j - 1)
+                elif s[i][j] == from_left:
+                    backtrack[i][j] = (i, j - 1)
+                else:
+                    backtrack[i][j] = (i - 1, j)
+
+        v_align, w_align = self.backtracking(backtrack, v, w, n - 1, m - 1, 0)
+
+        return v_align, w_align
+
     def affine_gap_penaly_alignment(self, v, w):
         n = len(v) + 1
         m = len(w) + 1
@@ -157,11 +203,78 @@ class Alignments:
 
         return v_align, w_align
 
+    def smith_waterman(self, v, w):
+        n = len(v) + 1
+        m = len(w) + 1
+
+        s = [[0 for _ in range(m)] for _ in range(n)]
+        backtrack = [[None for _ in range(m)] for _ in range(n)]
+
+        for i in range(n):
+            backtrack[i][0] = (i - 1, 0)
+        for j in range(m):
+            backtrack[0][j] = (0, j - 1)
+
+        max_score = float("-inf")
+        max_score_i = 0
+        max_score_j = 0
+
+        for i in range(1, n):
+            for j in range(1, m):
+                match_score = 0
+                match = self.match(v[i - 1], w[j - 1])
+                if match == 1:
+                    match_score = self.MATCH_SCORE
+                else:
+                    match_score = self.MISSMATCH_PENALTY
+
+                from_up = s[i - 1][j] + self.GAP_PENALTY
+                from_left = s[i][j - 1] + self.GAP_PENALTY
+                from_diag = s[i - 1][j - 1] + match_score
+
+                s[i][j] = max(from_up, from_left, from_diag)
+
+                if s[i][j] == from_diag:
+                    backtrack[i][j] = (i - 1, j - 1)
+                elif s[i][j] == from_left:
+                    backtrack[i][j] = (i, j - 1)
+                else:
+                    backtrack[i][j] = (i - 1, j)
+
+                if s[i][j] >= max_score:
+                    max_score = s[i][j]
+                    max_score_i = i
+                    max_score_j = j
+
+        v_align, w_align = self.backtracking(
+            backtrack, v, w, max_score_i, max_score_j, 0, s
+        )
+
+        return v_align, w_align
+
 
 import unittest
 
 
 class TestAlignments(unittest.TestCase):
+    def test_smith_waterman_simple_case(self):
+        al = Alignments(gap_penalty=-1, match_score=1, missmatch_penalty=0)
+        v = "OIUGNOISGRVISDIOGHIODSHFGMLSVEODRGMSOVFOGHLSDGMOVIDFHGS"
+        w = "DSHGMLSEOD"
+        self.assertEqual(("DSHFGMLSVEOD", "DSH-GMLS-EOD"), al.smith_waterman(v, w))
+
+    def test_needleman_wunch_simple_case_mismatch_favoring(self):
+        al = Alignments(gap_penalty=-100, missmatch_penalty=-10, match_score=2)
+        v = "abcd"
+        w = "abad"
+        self.assertEqual(("abcd", "abad"), al.needleman_wunch(v, w))
+
+    def test_needleman_wunch_simple_case_gap_favoring(self):
+        al = Alignments(gap_penalty=-1, missmatch_penalty=-10, match_score=2)
+        v = "abcd"
+        w = "abd"
+        self.assertEqual(("abcd", "ab-d"), al.needleman_wunch(v, w))
+
     def test_lcs_backtrack_same_words(self):
         al = Alignments()
         v = "abcd"
