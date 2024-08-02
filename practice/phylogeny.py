@@ -2,6 +2,10 @@ class Graph:
     def __init__(self, adjacency_list) -> None:
         self.adjacency_list = adjacency_list
 
+    def add_node(self, v):
+        if v not in self.adjacency_list:
+            self.adjacency_list[v] = []
+
     def add_neighbor(self, v, w, distance):
         self.adjacency_list[v].append((w, distance))
         self.adjacency_list[w] = [((v, distance))]
@@ -76,6 +80,27 @@ class Graph:
         return self.add_vertex_on_edge(v_i, v_j, local_distance_i, local_distance_j)
 
 
+class Cluster:
+    def __init__(self, elements=[], age=0) -> None:
+        self.age = age
+        self.elements = elements
+
+    def __str__(self) -> str:
+        return f"{self.elements}"
+
+    def distance(self, other_cluster, D):
+        total_distance = 0
+        for e_i in self.elements:
+            for e_j in other_cluster.elements:
+                d_ij = D[e_i][e_j]
+                total_distance += d_ij
+
+        return total_distance / (len(self.elements) + len(other_cluster.elements))
+
+    def merge(self, other_cluster):
+        return Cluster(elements=self.elements + other_cluster.elements)
+
+
 class Phylogeny:
     def limb(self, D, n):
         # naci i, k cvorove: Dnk + D = Dik + Din
@@ -111,6 +136,45 @@ class Phylogeny:
         T.add_neighbor(v, n - 1, limb_length)
 
         return T
+
+    def two_closest_clusters(self, clusters, D):
+        min_ci = None
+        min_cj = None
+        min_distance = float("inf")
+        for c_i in clusters:
+            for c_j in clusters:
+                if c_i != c_j:
+                    current_distance = c_i.distance(c_j, D)
+                    if current_distance < min_distance:
+                        min_ci = c_i
+                        min_cj = c_j
+                        min_distance = current_distance
+
+        return min_ci, min_cj, min_distance
+
+    def UPGMA(self, D, n):
+        clusters = [Cluster([i], 0) for i in range(n)]
+        adjacency_list = dict([(i, []) for i in range(n)])
+        T = Graph(adjacency_list)
+
+        while len(clusters) > 1:
+            c_i, c_j, dist = self.two_closest_clusters(clusters, D)
+            c_new = c_i.merge(c_j)
+            c_new.age = dist / 2
+            T.add_node(str(c_new))
+            T.add_neighbor(
+                str(c_new),
+                str(c_i),
+            )
+            T.add_neighbor(str(c_new), str(c_j))
+
+            clusters = [
+                cluster for cluster in clusters if cluster != c_i and cluster != c_j
+            ]
+            clusters.append(c_new)
+
+        root = str(clusters[0])
+        return T, root
 
 
 import unittest
